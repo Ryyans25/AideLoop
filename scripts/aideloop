@@ -1,0 +1,245 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  scripts/aideloop episode new [--level light|full] [request...]
+  scripts/aideloop episode list
+  scripts/aideloop episode path <episode-id>
+  scripts/aideloop status
+
+Creates and locates AideLoop episode files for worker/evaluator handoff.
+USAGE
+}
+
+die() {
+  echo "error: $*" >&2
+  exit 1
+}
+
+find_root() {
+  local dir="$PWD"
+
+  while [[ "$dir" != "/" ]]; do
+    if [[ -d "$dir/.aideloop" || -f "$dir/AGENTS.md" ]]; then
+      printf '%s\n' "$dir"
+      return
+    fi
+    dir="$(dirname "$dir")"
+  done
+
+  die "could not find an AideLoop project root"
+}
+
+root="$(find_root)"
+episodes_dir="$root/.aideloop/episodes"
+state_dir="$root/.aideloop/state"
+
+ensure_runtime_dirs() {
+  mkdir -p "$episodes_dir" "$state_dir"
+}
+
+next_episode_id() {
+  local day
+  local next
+
+  day="$(date +%Y%m%d)"
+  next="$(
+    find "$episodes_dir" -maxdepth 1 -type d -name "al_${day}_*" 2>/dev/null \
+      | sed -E "s/.*al_${day}_([0-9]+)$/\1/" \
+      | sort -n \
+      | tail -n 1
+  )"
+
+  if [[ -z "$next" ]]; then
+    next=1
+  else
+    next=$((10#$next + 1))
+  fi
+
+  printf 'al_%s_%03d\n' "$day" "$next"
+}
+
+read_request() {
+  local request="$*"
+
+  if [[ -z "$request" && ! -t 0 ]]; then
+    request="$(cat)"
+  fi
+
+  if [[ -z "$request" ]]; then
+    request="TODO: add user request"
+  fi
+
+  printf '%s\n' "$request"
+}
+
+cmd_episode_new() {
+  ensure_runtime_dirs
+
+  local level="full"
+  local args=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --level)
+        shift
+        [[ $# -gt 0 ]] || die "--level requires a value"
+        level="$1"
+        ;;
+      --level=*)
+        level="${1#--level=}"
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        args+=("$1")
+        ;;
+    esac
+    shift
+  done
+
+  case "$level" in
+    light|full) ;;
+    *) die "level must be light or full" ;;
+  esac
+
+  local episode_id
+  local episode_dir
+  local request
+  local today
+
+  episode_id="$(next_episode_id)"
+  episode_dir="$episodes_dir/$episode_id"
+  request="$(read_request "${args[@]}")"
+  today="$(date +%Y-%m-%d)"
+
+  mkdir -p "$episode_dir/evidence"
+
+  cat > "$episode_dir/request.md" <<EOF
+# Request
+
+$request
+EOF
+
+  cat > "$episode_dir/criteria.yaml" <<EOF
+episode_id: $episode_id
+created: $today
+level: $level
+criteria:
+  - id: C1
+    description: "TODO: define what must be true for this task to be complete."
+    source: user_request
+    weight: must
+    verification_method: reasoning
+    evidence_required: "TODO"
+EOF
+
+  cat > "$episode_dir/worker_completion.yaml" <<EOF
+episode_id: $episode_id
+summary: ""
+artifacts:
+  files_changed: []
+  commands_run: []
+  evidence: []
+known_risks: []
+EOF
+
+  cat > "$episode_dir/evaluator_verdict.yaml" <<EOF
+episode_id: $episode_id
+verdict: pending
+checked: []
+failed_criteria: []
+repair_instructions: []
+memory_candidates: []
+EOF
+
+  cat > "$episode_dir/final.md" <<'EOF'
+# Final
+
+EOF
+
+  cat > "$episode_dir/raw_log.md" <<EOF
+# Raw Log
+
+Created: $today
+EOF
+
+  cat > "$state_dir/current-episode" <<EOF
+$episode_id
+EOF
+
+  echo "$episode_id"
+  echo "$episode_dir"
+}
+
+cmd_episode_list() {
+  ensure_runtime_dirs
+
+  find "$episodes_dir" -maxdepth 1 -type d -name 'al_*' -print \
+    | sed "s#^$episodes_dir/##" \
+    | sort
+}
+
+cmd_episode_path() {
+  [[ $# -eq 1 ]] || die "episode path requires <episode-id>"
+
+  local episode_dir="$episodes_dir/$1"
+  [[ -d "$episode_dir" ]] || die "episode not found: $1"
+  printf '%s\n' "$episode_dir"
+}
+
+cmd_status() {
+  ensure_runtime_dirs
+
+  echo "root: $root"
+  echo "episodes: $episodes_dir"
+
+  if [[ -f "$state_dir/current-episode" ]]; then
+    echo "current_episode: $(cat "$state_dir/current-episode")"
+  else
+    echo "current_episode: none"
+  fi
+}
+
+if [[ $# -eq 0 ]]; then
+  usage
+  exit 0
+fi
+
+case "$1" in
+  episode)
+    shift
+    [[ $# -gt 0 ]] || die "episode requires a subcommand"
+    case "$1" in
+      new)
+        shift
+        cmd_episode_new "$@"
+        ;;
+      list)
+        shift
+        cmd_episode_list "$@"
+        ;;
+      path)
+        shift
+        cmd_episode_path "$@"
+        ;;
+      *)
+        die "unknown episode subcommand: $1"
+        ;;
+    esac
+    ;;
+  status)
+    shift
+    cmd_status "$@"
+    ;;
+  -h|--help)
+    usage
+    ;;
+  *)
+    die "unknown command: $1"
+    ;;
+esac

@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: scripts/init-aideloop [target-dir] [--force]
+
+Initializes a Codex-first AideLoop setup in target-dir.
+
+Options:
+  --force   Overwrite AGENTS.md and the AideLoop skill files.
+USAGE
+}
+
+target="."
+force="false"
+
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --force)
+      force="true"
+      ;;
+    *)
+      target="$arg"
+      ;;
+  esac
+done
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source_root="$(cd "$script_dir/.." && pwd)"
+target_root="$(cd "$target" && pwd)"
+
+copy_file() {
+  local src="$1"
+  local dst="$2"
+
+  mkdir -p "$(dirname "$dst")"
+
+  if [[ -e "$dst" && "$force" != "true" ]]; then
+    echo "skip existing: ${dst#$target_root/}"
+    return
+  fi
+
+  cp "$src" "$dst"
+  echo "write: ${dst#$target_root/}"
+}
+
+ensure_line() {
+  local file="$1"
+  local line="$2"
+
+  touch "$file"
+
+  if ! grep -Fxq "$line" "$file"; then
+    printf '%s\n' "$line" >> "$file"
+    echo "append: ${file#$target_root/} -> $line"
+  fi
+}
+
+copy_file "$source_root/AGENTS.md" "$target_root/AGENTS.md"
+copy_file "$source_root/scripts/aideloop" "$target_root/scripts/aideloop"
+chmod +x "$target_root/scripts/aideloop"
+
+while IFS= read -r -d '' file; do
+  rel="${file#$source_root/}"
+  copy_file "$file" "$target_root/$rel"
+done < <(find "$source_root/.aideloop/skills" -type f -print0)
+
+mkdir -p \
+  "$target_root/.aideloop/memory/revisions" \
+  "$target_root/.aideloop/memory/inbox" \
+  "$target_root/.aideloop/memory/concepts" \
+  "$target_root/.aideloop/memory/projects" \
+  "$target_root/.aideloop/memory/preferences" \
+  "$target_root/.aideloop/memory/decisions" \
+  "$target_root/.aideloop/episodes" \
+  "$target_root/.aideloop/state"
+
+if [[ ! -e "$target_root/.aideloop/memory/index.md" ]]; then
+  cat > "$target_root/.aideloop/memory/index.md" <<'EOF'
+# AideLoop Memory Index
+
+## Profile
+
+| File | Summary | Updated |
+| --- | --- | --- |
+| profile.md | Personal preferences and stable working style. | - |
+
+## Projects
+
+| Slug | Title | Summary | Updated |
+| --- | --- | --- | --- |
+
+## Decisions
+
+| Slug | Title | Summary | Updated |
+| --- | --- | --- | --- |
+
+## Preferences
+
+| Slug | Title | Summary | Updated |
+| --- | --- | --- | --- |
+
+## Concepts
+
+| Slug | Title | Summary | Updated |
+| --- | --- | --- | --- |
+EOF
+  echo "write: .aideloop/memory/index.md"
+fi
+
+if [[ ! -e "$target_root/.aideloop/memory/profile.md" ]]; then
+  cat > "$target_root/.aideloop/memory/profile.md" <<'EOF'
+# Profile
+
+## Summary
+
+No durable personal preferences have been recorded yet.
+
+## Preferences
+
+- Keep AideLoop simple, local-first, and Codex-only for the MVP.
+
+## Gaps
+
+- Add preferences only after they are observed or explicitly stated.
+EOF
+  echo "write: .aideloop/memory/profile.md"
+fi
+
+if [[ ! -e "$target_root/.aideloop/memory/worklog.md" ]]; then
+  today="$(date +%Y-%m-%d)"
+  cat > "$target_root/.aideloop/memory/worklog.md" <<EOF
+# Worklog
+
+## $today
+
+- Initialized AideLoop.
+EOF
+  echo "write: .aideloop/memory/worklog.md"
+fi
+
+if [[ ! -e "$target_root/.aideloop/state/memory-checkpoint.json" ]]; then
+  cat > "$target_root/.aideloop/state/memory-checkpoint.json" <<'EOF'
+{
+  "schema_version": 1,
+  "last_episode_id": null,
+  "last_memory_update_at": null,
+  "last_daily_compaction_date": null,
+  "last_compacted_memory_hash": null,
+  "pending_inbox_count": 0
+}
+EOF
+  echo "write: .aideloop/state/memory-checkpoint.json"
+fi
+
+gitignore="$target_root/.gitignore"
+touch "$gitignore"
+if [[ -s "$gitignore" ]] && [[ "$(tail -c 1 "$gitignore")" != $'\n' ]]; then
+  printf '\n' >> "$gitignore"
+fi
+if [[ -s "$gitignore" ]] && ! grep -Fxq "# AideLoop local memory and task state" "$gitignore"; then
+  printf '\n' >> "$gitignore"
+fi
+ensure_line "$gitignore" "# AideLoop local memory and task state"
+ensure_line "$gitignore" ".aideloop/memory/"
+ensure_line "$gitignore" ".aideloop/episodes/"
+ensure_line "$gitignore" ".aideloop/state/"
+
+cat <<'EOF'
+
+AideLoop initialized.
+
+Next:
+  1. Open the target project in Codex.
+  2. Ask Codex: "Use AideLoop for this task."
+  3. For file changes, reviews, or memory writes, AideLoop should use eval: full.
+EOF
