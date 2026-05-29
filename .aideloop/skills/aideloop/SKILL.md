@@ -28,7 +28,7 @@ Build a small context pack using `references/retrieval.md`.
 
 At minimum:
 
-- Read `AGENTS.md`.
+- Read the available host entry file: `CLAUDE.md`, `AGENTS.md`, or `.github/copilot-instructions.md`.
 - Read `.aideloop/memory/profile.md` if it exists.
 - Read `.aideloop/memory/index.md` if it exists.
 - Select only the memory files relevant to the task.
@@ -98,4 +98,4 @@ Use `references/memory-format.md`.
 - Do not store secrets, tokens, private keys, or failed attempts as durable facts.
 - Do not copy full transcripts into memory articles.
 - Do not write directly to `.aideloop/memory/` from multiple parallel agents.
-- Do not assume Claude Code or GitHub Copilot support in the Codex-only MVP.
+- Do not assume all host adapters have identical multi-agent behavior; use the file protocol as the source of truth.

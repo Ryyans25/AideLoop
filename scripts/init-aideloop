@@ -3,20 +3,22 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/init-aideloop [target-dir] [--force]
+Usage: scripts/init-aideloop [target-dir] [--profile claude|codex|copilot] [--force]
 
-Initializes a Codex-first AideLoop setup in target-dir.
+Initializes an AideLoop setup in target-dir.
 
 Options:
-  --force   Overwrite AGENTS.md and the AideLoop skill files.
+  --profile  Host adapter to install. Defaults to claude.
+  --force    Overwrite existing adapter and AideLoop files.
 USAGE
 }
 
 target="."
 force="false"
+profile="claude"
 
-for arg in "$@"; do
-  case "$arg" in
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     -h|--help)
       usage
       exit 0
@@ -24,11 +26,31 @@ for arg in "$@"; do
     --force)
       force="true"
       ;;
+    --profile)
+      shift
+      [[ $# -gt 0 ]] || {
+        echo "error: --profile requires a value" >&2
+        exit 1
+      }
+      profile="$1"
+      ;;
+    --profile=*)
+      profile="${1#--profile=}"
+      ;;
     *)
-      target="$arg"
+      target="$1"
       ;;
   esac
+  shift
 done
+
+case "$profile" in
+  claude|codex|copilot) ;;
+  *)
+    echo "error: profile must be claude, codex, or copilot" >&2
+    exit 1
+    ;;
+esac
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source_root="$(cd "$script_dir/.." && pwd)"
@@ -61,14 +83,45 @@ ensure_line() {
   fi
 }
 
-copy_file "$source_root/AGENTS.md" "$target_root/AGENTS.md"
+require_path() {
+  local path="$1"
+
+  if [[ ! -e "$path" ]]; then
+    echo "error: missing required profile path: ${path#$source_root/}" >&2
+    exit 1
+  fi
+}
+
+copy_tree_files() {
+  local dir="$1"
+
+  [[ -d "$dir" ]] || return 0
+  while IFS= read -r -d '' file; do
+    rel="${file#$source_root/}"
+    copy_file "$file" "$target_root/$rel"
+  done < <(find "$dir" -type f -print0)
+}
+
 copy_file "$source_root/scripts/aideloop" "$target_root/scripts/aideloop"
 chmod +x "$target_root/scripts/aideloop"
+copy_tree_files "$source_root/.aideloop/skills"
 
-while IFS= read -r -d '' file; do
-  rel="${file#$source_root/}"
-  copy_file "$file" "$target_root/$rel"
-done < <(find "$source_root/.aideloop/skills" -type f -print0)
+case "$profile" in
+  claude)
+    require_path "$source_root/CLAUDE.md"
+    require_path "$source_root/.claude"
+    copy_file "$source_root/CLAUDE.md" "$target_root/CLAUDE.md"
+    copy_tree_files "$source_root/.claude"
+    ;;
+  codex)
+    require_path "$source_root/AGENTS.md"
+    copy_file "$source_root/AGENTS.md" "$target_root/AGENTS.md"
+    ;;
+  copilot)
+    require_path "$source_root/.github"
+    copy_tree_files "$source_root/.github"
+    ;;
+esac
 
 mkdir -p \
   "$target_root/.aideloop/memory/revisions" \
@@ -123,7 +176,7 @@ No durable personal preferences have been recorded yet.
 
 ## Preferences
 
-- Keep AideLoop simple, local-first, and Codex-only for the MVP.
+- Keep AideLoop simple, local-first, and adapter-friendly.
 
 ## Gaps
 
@@ -176,7 +229,7 @@ cat <<'EOF'
 AideLoop initialized.
 
 Next:
-  1. Open the target project in Codex.
-  2. Ask Codex: "Use AideLoop for this task."
+  1. Open the target project in your chosen agent host.
+  2. Ask the agent: "Use AideLoop for this task."
   3. For file changes, reviews, or memory writes, AideLoop should use eval: full.
 EOF

@@ -2,7 +2,7 @@
 
 A tiny loop for personal coding agents that should remember, verify, and stop pretending "done" is a feeling.
 
-Inspired by Karpathy-style coding-agent discipline and Anthropic-style evaluator harnesses, packaged as a few files you can drop into a Codex project.
+Inspired by Karpathy-style coding-agent discipline and Anthropic-style evaluator harnesses, packaged as a few files you can drop into a project.
 
 ## The Four Rules
 
@@ -13,7 +13,7 @@ Inspired by Karpathy-style coding-agent discipline and Anthropic-style evaluator
 
 That's it.
 
-No daemon. No database. No dashboard. Just a small loop that makes Codex behave more like a dependable assistant.
+No daemon. No database. No dashboard. Just a small file protocol that makes coding agents behave more like dependable assistants.
 
 ## Why This Exists
 
@@ -26,30 +26,68 @@ Most agent failures are boring:
 
 AideLoop keeps the loop small enough to actually use.
 
+## Default Shape
+
+The repository is directly usable as a Claude Code setup:
+
+```text
+CLAUDE.md
+.claude/
+  agents/
+    aideloop-worker.md
+    aideloop-evaluator.md
+    aideloop-memory-maintainer.md
+scripts/
+  aideloop
+  init-claude
+  init-codex
+  init-copilot
+.aideloop/
+  skills/aideloop/
+  memory/      # ignored by git
+  episodes/    # ignored by git
+  state/       # ignored by git
+```
+
+Claude Code gets the native multi-agent shape: worker, evaluator, and memory maintainer are separate project agents.
+
 ## Quick Start
 
-Initialize AideLoop in this project:
+Install AideLoop into another Claude Code project:
 
 ```bash
-scripts/init-aideloop
+scripts/init-claude /path/to/project
 ```
 
-Initialize another project:
+Install the Codex adapter:
 
 ```bash
-scripts/init-aideloop /path/to/project
+scripts/init-codex /path/to/project
 ```
 
-Then open the project in Codex and say:
+Install the VS Code Copilot adapter:
+
+```bash
+scripts/init-copilot /path/to/project
+```
+
+Then open the target project in your agent host and say:
 
 ```text
 Use AideLoop for this task.
 ```
 
-## What It Adds
+## Adapter Model
+
+AideLoop core is file-based and host-agnostic. Each adapter chooses how to run the same loop:
+
+- Claude Code uses separate project agents under `.claude/agents/`.
+- Codex uses `AGENTS.md` plus the shared AideLoop skill as a merged role-switching entry.
+- VS Code Copilot uses `.github/copilot-instructions.md`, `.github/agents/`, and `.github/skills/`.
+
+The shared protocol is always:
 
 ```text
-AGENTS.md
 scripts/aideloop
 .aideloop/
   skills/aideloop/
