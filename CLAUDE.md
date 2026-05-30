@@ -15,6 +15,10 @@ For non-trivial tasks, use the project subagents in `.claude/agents/`:
 - `aideloop-evaluator`: verifies criteria against evidence before success is claimed.
 - `aideloop-memory-maintainer`: writes durable memory only after evaluation passes.
 
+For full tasks, the worker controls the loop: it completes the work, invokes
+`aideloop-evaluator` with the `Task` tool, repairs on `fail`, and invokes
+`aideloop-memory-maintainer` only after evaluator `pass` with memory candidates.
+
 Shared protocol files live under `.aideloop/`. Keep `.aideloop/memory/`,
 `.aideloop/episodes/`, and `.aideloop/state/` private and uncommitted.
 

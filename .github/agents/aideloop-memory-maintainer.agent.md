@@ -5,7 +5,8 @@ target: vscode
 tools:
   - search
   - edit
-  - runCommands
+  - execute/getTerminalOutput
+  - execute/runInTerminal
 ---
 
 # AideLoop Memory Maintainer

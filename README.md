@@ -79,11 +79,17 @@ Use AideLoop for this task.
 
 ## Adapter Model
 
-AideLoop core is file-based and host-agnostic. Each adapter chooses how to run the same loop:
+AideLoop core is file-based and host-agnostic. The control model is always:
 
-- Claude Code uses separate project agents under `.claude/agents/`.
-- Codex uses `AGENTS.md` plus the shared AideLoop skill as a merged role-switching entry.
-- VS Code Copilot uses `.github/copilot-instructions.md`, `.github/agents/`, and `.github/skills/`.
+```text
+worker -> evaluator -> pass/fail -> repair or memory -> done
+```
+
+Each adapter chooses how to execute that same loop:
+
+- Claude Code uses `Task` to invoke project agents under `.claude/agents/`.
+- VS Code Copilot uses `agent` with `.github/agents/`.
+- Codex uses `AGENTS.md` plus the shared AideLoop skill as a merged role-switching entry in one agent.
 
 The shared protocol is always:
 
@@ -96,7 +102,7 @@ scripts/aideloop
   state/       # ignored by git
 ```
 
-Create a worker/evaluator handoff episode:
+Create a worker/evaluator episode:
 
 ```bash
 scripts/aideloop episode new --level full "Implement the task"

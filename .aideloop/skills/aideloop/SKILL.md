@@ -12,6 +12,11 @@ AideLoop keeps personal agent work simple:
 4. Verify evidence.
 5. Write useful memories with rollback evidence.
 
+The worker controls the evaluation loop. If the host has a subagent tool,
+the worker invokes the evaluator with that tool. If the host does not expose
+subagents, the same agent performs the evaluator pass in-thread using the
+same criteria and evidence.
+
 ## Evaluation Levels
 
 - `off`: only for tiny wording or cleanup tasks.
@@ -79,6 +84,10 @@ If using an episode, write this packet to `worker_completion.yaml`.
 For `light`, run the checklist yourself and report any uncertainty.
 
 For `full`, run an evaluator pass using `references/evaluator.md`. The evaluator verifies evidence, not the worker's confidence.
+
+- Claude Code: the worker uses `Task` to invoke `aideloop-evaluator`.
+- VS Code Copilot: the worker uses `agent` to invoke `aideloop-evaluator`.
+- Codex or other single-agent hosts: run the evaluator pass in the current thread.
 
 If evaluation fails, repair the failed criteria before finalizing.
 

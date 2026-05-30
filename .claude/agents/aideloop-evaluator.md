@@ -24,6 +24,7 @@ Read the current episode from `.aideloop/state/current-episode`, then inspect:
 3. Write or propose `evaluator_verdict.yaml`.
 4. If failed, provide concise repair instructions.
 5. If passed, emit memory candidates only for durable, useful, verified facts.
+6. Return the verdict summary to the caller. Do not call or hand off to worker or memory maintainer.
 
 ## Verdict Shape
 
@@ -44,3 +45,4 @@ memory_candidates: []
 - Do not expand scope beyond the user's request.
 - Do not write durable memory for failed work.
 - Do not accept missing evidence for must-pass criteria.
+- Do not dispatch other agents. The worker decides whether to repair or call memory maintainer.
